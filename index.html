@@ -28,14 +28,15 @@
 
     <div id="login-overlay">
         <div class="card">
-            <h2>NIFTY 50 Instant Connect</h2>
-            <div id="status-msg">Enter Feed Token for Instant Connection</div>
+            <h2>NIFTY 50 Live Chart</h2>
+            <div id="status-msg">Instant Login with Authenticator Code</div>
             
-            <input type="text" id="apiKey" placeholder="Angel One API Key">
-            <input type="text" id="clientCode" placeholder="Client ID (e.g. A123456)">
-            <input type="text" id="feedToken" placeholder="Feed Token">
+            <input type="text" id="apiKey" placeholder="API Key" value="juQxDmC6">
+            <input type="text" id="clientCode" placeholder="Angel One Client ID">
+            <input type="password" id="mpin" placeholder="4-Digit Angel One MPIN">
+            <input type="text" id="totp" placeholder="6-Digit Authenticator TOTP">
             
-            <button onclick="launchChart()" style="width:100%; padding: 12px; font-size:14px;">Launch NIFTY 50 Chart</button>
+            <button onclick="instantLogin()" style="width:100%; padding: 12px; font-size:14px;">Instant Connect NIFTY 50</button>
         </div>
     </div>
 
@@ -72,19 +73,63 @@
         function setTool(tool) { drawingManager.setTool(tool); }
         function clearDrawings() { drawingManager.clearDrawings(); }
 
-        function launchChart() {
+        async function instantLogin() {
             const apiKey = document.getElementById('apiKey').value.trim();
             const clientCode = document.getElementById('clientCode').value.trim();
-            const feedToken = document.getElementById('feedToken').value.trim();
+            const mpin = document.getElementById('mpin').value.trim();
+            const totp = document.getElementById('totp').value.trim();
+            const statusMsg = document.getElementById('status-msg');
 
-            if (!apiKey || !clientCode || !feedToken) {
-                alert('Please enter API Key, Client ID, and Feed Token');
+            if (!apiKey || !clientCode || !mpin || !totp) {
+                alert('Please fill all fields');
                 return;
             }
 
-            document.getElementById('login-overlay').style.display = 'none';
-            initChart();
-            connectWebSocket(clientCode, apiKey, feedToken);
+            statusMsg.style.color = "#00e676";
+            statusMsg.innerText = "Connecting instantly...";
+
+            // Ultra-Fast High-Speed Proxy Bridge
+            const fastProxy = "https://thingproxy.freeboard.io/fetch/";
+            const targetApi = "https://apiconnect.angelone.in/rest/auth/angelone/user/v1/loginByPassword";
+
+            try {
+                const response = await fetch(fastProxy + targetApi, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-UserType': 'USER',
+                        'X-SourceID': 'WEB',
+                        'X-ClientLocalIP': '127.0.0.1',
+                        'X-ClientPublicIP': '127.0.0.1',
+                        'X-MACAddress': 'fe80::1',
+                        'X-PrivateKey': apiKey
+                    },
+                    body: JSON.stringify({
+                        clientcode: clientCode,
+                        password: mpin,
+                        totp: totp
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status && result.data && result.data.feedToken) {
+                    statusMsg.innerText = "Connected! Opening Chart...";
+                    setTimeout(() => {
+                        document.getElementById('login-overlay').style.display = 'none';
+                        initChart();
+                        connectWebSocket(clientCode, apiKey, result.data.feedToken);
+                    }, 300);
+                } else {
+                    statusMsg.style.color = "#f44336";
+                    statusMsg.innerText = "Error: " + (result.message || "Invalid Details or TOTP");
+                }
+            } catch (err) {
+                console.error(err);
+                statusMsg.style.color = "#f44336";
+                statusMsg.innerText = "Connection Failed. Refresh TOTP & Try Again.";
+            }
         }
 
         function connectWebSocket(clientCode, apiKey, feedToken) {
