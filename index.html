@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>NIFTY 50 Live Chart</title>
     
+    <!-- TradingView Lightweight Charts Library -->
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Mobile Touch Drawing Tools Plugin -->
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts-drawing@0.2.0/dist/lightweight-charts-drawing.umd.production.js"></script>
 
     <style>
@@ -17,6 +19,7 @@
         button.danger { background: #f44336; }
         #chart { flex: 1; width: 100vw; }
 
+        /* Login Screen Modal */
         #login-overlay { position: fixed; inset: 0; background: #131722; display: flex; flex-direction: column; justify-content: center; padding: 24px; z-index: 1000; }
         .card { background: #1e222d; border: 1px solid #2a2e39; border-radius: 8px; padding: 20px; }
         h2 { color: #2962ff; font-size: 20px; margin-bottom: 16px; text-align: center; }
@@ -26,20 +29,22 @@
 </head>
 <body>
 
+    <!-- Login Modal -->
     <div id="login-overlay">
         <div class="card">
             <h2>NIFTY 50 Live Chart</h2>
-            <div id="status-msg">Enter Login Details</div>
+            <div id="status-msg">Enter Credentials & Google Authenticator TOTP</div>
             
             <input type="text" id="apiKey" placeholder="Angel One API Key">
             <input type="text" id="clientCode" placeholder="Client ID (e.g. A123456)">
-            <input type="password" id="mpin" placeholder="4-Digit MPIN">
+            <input type="password" id="mpin" placeholder="4-Digit Angel One MPIN">
             <input type="text" id="totp" placeholder="6-Digit Authenticator TOTP">
             
             <button onclick="loginAndLaunch()" style="width:100%; padding: 12px; font-size:14px;">Open NIFTY 50 Chart</button>
         </div>
     </div>
 
+    <!-- Toolbar -->
     <div id="toolbar">
         <span style="font-size:12px; font-weight:bold; color:#00e676; align-self:center; margin-right:6px;">NIFTY 50</span>
         <button onclick="setTool('trend_line')">✏️ Trendline</button>
@@ -48,6 +53,7 @@
         <button class="danger" onclick="clearDrawings()">🗑️ Clear</button>
     </div>
 
+    <!-- Chart Screen -->
     <div id="chart"></div>
 
     <script>
@@ -81,15 +87,15 @@
             const statusMsg = document.getElementById('status-msg');
 
             if (!apiKey || !clientCode || !mpin || !totp) {
-                alert('Please enter all 4 fields');
+                alert('Please fill all fields');
                 return;
             }
 
             statusMsg.style.color = "#ff9800";
-            statusMsg.innerText = "Authenticating with Angel One...";
+            statusMsg.innerText = "Connecting via Secure CORS Bridge...";
 
-            // CORS Proxy URL to bypass browser restriction
-            const proxyUrl = "https://corsproxy.io/?";
+            // Open Public CORS Bridge Endpoint
+            const proxyUrl = "https://api.allorigins.win/raw?url=";
             const targetApi = "https://apiconnect.angelone.in/rest/auth/angelone/user/v1/loginByPassword";
 
             try {
@@ -138,9 +144,9 @@
             const wsUrl = `wss://smartapisocket.angelone.in/smart-stream?clientCode=${clientCode}&feedToken=${feedToken}&apiKey=${apiKey}`;
             try {
                 ws = new WebSocket(wsUrl);
-                ws.onopen = () => { console.log('Connected to NIFTY Stream'); };
+                ws.onopen = () => { console.log('Connected to NIFTY 50 Stream'); };
             } catch (e) {
-                console.log('WS Error:', e);
+                console.log('WS Connection Error:', e);
             }
         }
     </script>
