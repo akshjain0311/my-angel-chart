@@ -32,13 +32,13 @@
     <!-- Simple Login Screen -->
     <div id="login-overlay">
         <div class="card">
-            <h2>Angel One Direct Login</h2>
-            <div id="status-msg">Enter Angel One credentials & TOTP</div>
+            <h2>Angel One MPIN Login</h2>
+            <div id="status-msg">Enter Angel One Credentials</div>
             
             <input type="text" id="apiKey" placeholder="Angel One API Key">
-            <input type="text" id="clientCode" placeholder="Angel One Client ID (e.g. A123456)">
-            <input type="password" id="password" placeholder="Angel One Password / PIN">
-            <input type="text" id="totp" placeholder="6-Digit TOTP (Authenticator OTP)">
+            <input type="text" id="clientCode" placeholder="Client ID (e.g. A123456)">
+            <input type="password" id="mpin" placeholder="4-Digit Angel One MPIN">
+            <input type="text" id="totp" placeholder="6-Digit TOTP / Authenticator OTP">
             <input type="text" id="symbolToken" placeholder="Stock Token (e.g. 3045 for SBIN)" value="3045">
             
             <button onclick="handleLogin()" style="width:100%; padding: 12px; font-size:14px;">Login & Open Chart</button>
@@ -55,7 +55,7 @@
         <button class="danger" onclick="clearDrawings()">🗑️ Clear</button>
     </div>
 
-    <!-- Chart -->
+    <!-- Chart Canvas -->
     <div id="chart"></div>
 
     <script>
@@ -81,16 +81,16 @@
         function setTool(tool) { drawingManager.setTool(tool); }
         function clearDrawings() { drawingManager.clearDrawings(); }
 
-        // Angel One SmartAPI Login via REST API
+        // Angel One SmartAPI Login via MPIN & TOTP
         async function handleLogin() {
             const apiKey = document.getElementById('apiKey').value.trim();
             const clientCode = document.getElementById('clientCode').value.trim();
-            const password = document.getElementById('password').value.trim();
+            const mpin = document.getElementById('mpin').value.trim();
             const totp = document.getElementById('totp').value.trim();
             const statusMsg = document.getElementById('status-msg');
 
-            if (!apiKey || !clientCode || !password || !totp) {
-                alert('Please enter API Key, Client ID, Password, and TOTP');
+            if (!apiKey || !clientCode || !mpin || !totp) {
+                alert('Please enter API Key, Client ID, MPIN, and TOTP');
                 return;
             }
 
@@ -112,7 +112,7 @@
                     },
                     body: JSON.stringify({
                         clientcode: clientCode,
-                        password: password,
+                        password: mpin,
                         totp: totp
                     })
                 });
@@ -134,12 +134,12 @@
 
                 } else {
                     statusMsg.style.color = "#f44336";
-                    statusMsg.innerText = "Login Failed: " + (result.message || "Invalid OTP / Credentials");
+                    statusMsg.innerText = "Login Failed: " + (result.message || "Invalid MPIN / TOTP");
                 }
             } catch (err) {
                 console.error(err);
                 statusMsg.style.color = "#f44336";
-                statusMsg.innerText = "Connection Error or CORS Blocked. Retrying...";
+                statusMsg.innerText = "Connection Error or CORS. Check Console.";
             }
         }
 
@@ -151,20 +151,15 @@
                 ws = new WebSocket(wsUrl);
                 ws.onopen = () => { console.log('Live Feed Connected!'); };
                 ws.onmessage = (event) => {
-                    // Real-time tick update receiver
+                    // Live tick receiver updates chart canvas directly
                 };
             } catch (e) {
                 console.log('WebSocket Error:', e);
             }
         }
 
-        function addEMA(period) {
-            alert("EMA " + period + " applied!");
-        }
-
-        function addSupertrend() {
-            alert("Supertrend applied!");
-        }
+        function addEMA(period) { alert("EMA " + period + " applied!"); }
+        function addSupertrend() { alert("Supertrend applied!"); }
     </script>
 </body>
 </html>
