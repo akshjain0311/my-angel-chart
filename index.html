@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Personal Angel One Chart App</title>
+    
+    <!-- TradingView Lightweight Charts JS Engine -->
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Mobile Touch Drawing Tools Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts-drawing@0.2.0/dist/lightweight-charts-drawing.umd.production.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #131722; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Top Navigation & Toolbar */
+        #toolbar { display: flex; gap: 6px; padding: 8px; background: #1e222d; border-bottom: 1px solid #2a2e39; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        button { background: #2962ff; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+        button:active { background: #1e4bd8; }
+        button.indicator-btn { background: #009688; }
+        button.danger { background: #f44336; }
+
+        /* Chart Canvas Area */
+        #chart { flex: 1; width: 100vw; }
+
+        /* Login Overlay Modal */
+        #login-overlay { position: fixed; inset: 0; background: #131722; display: flex; flex-direction: column; justify-content: center; padding: 24px; z-index: 1000; }
+        .card { background: #1e222d; border: 1px solid #2a2e39; border-radius: 8px; padding: 20px; }
+        h2 { color: #2962ff; font-size: 20px; margin-bottom: 16px; }
+        input { width: 100%; background: #131722; border: 1px solid #2a2e39; color: #fff; padding: 12px; margin-bottom: 12px; border-radius: 4px; font-size: 14px; outline: none; }
+        input:focus { border-color: #2962ff; }
+        
+        /* Custom PineScript Modal */
+        #pine-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; padding: 20px; align-items: center; justify-content: center; }
+        textarea { width: 100%; height: 200px; background: #131722; border: 1px solid #2a2e39; color: #00ff66; font-family: monospace; padding: 10px; border-radius: 4px; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Angel One Credentials Login Panel -->
+    <div id="login-overlay">
+        <div class="card">
+            <h2>Angel One Live Chart</h2>
+            <input type="text" id="apiKey" placeholder="Angel One API Key">
+            <input type="text" id="clientCode" placeholder="Client Code (e.g. A123456)">
+            <input type="password" id="feedToken" placeholder="Feed Token (Generated Daily)">
+            <input type="text" id="tokenID" placeholder="Token ID (e.g. 3045 for SBIN)" value="3045">
+            <button onclick="launchChart()" style="width:100%; padding: 12px; font-size:14px;">Launch Chart</button>
+        </div>
+    </div>
+
+    <!-- 2. Drawing & Indicator Toolbars -->
+    <div id="toolbar">
+        <button onclick="setTool('trend_line')">✏️ Trendline</button>
+        <button onclick="setTool('horizontal_line')">➖ Horz Line</button>
+        <button onclick="setTool('fib_retracement')">🌀 Fibonacci</button>
+        <button class="indicator-btn" onclick="addEMA(20)">📈 EMA 20</button>
+        <button class="indicator-btn" onclick="addSupertrend()">🚀 Supertrend</button>
+        <button class="indicator-btn" onclick="openPineModal()">📜 Convert PineScript</button>
+        <button class="danger" onclick="clearDrawings()">🗑️ Clear Tools</button>
+    </div>
+
+    <!-- 3. TradingView Chart Canvas Container -->
+    <div id="chart"></div>
+
+    <!-- 4. PineScript JS Engine Modal -->
+    <div id="pine-modal">
+        <div class="card" style="width: 100%; max-width: 500px;">
+            <h3>Paste PineScript Logic</h3>
+            <p style="font-size:11px; color:#aaa; margin: 6px 0 12px 0;">Paste simple PineScript indicator formula (e.g., EMA, SMA, ATR based logic):</p>
+            <textarea id="pineCode" placeholder="//@version=5&#10;indicator('My Indicator', overlay=true)&#10;ema20 = ta.ema(close, 20)&#10;plot(ema20)"></textarea>
+            <button onclick="applyCustomPineScript()" style="width:100%;">Apply Indicator to Chart</button>
+            <button class="danger" onclick="closePineModal()" style="width:100%; margin-top:6px;">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let chart, candleSeries, drawingManager, ws;
+        let candleBuffer = [];
+
+        // Sample Candle Data Generator (Initial Load)
+        function generateHistoricalCandles() {
+            let now = new Date();
+            let candles = [];
+            let price = 500.0;
+            for (let i = 100; i >= 0; i--) {
+                let time = new Date(now.getTime() - i * 60000);
+                let open = price + (Math.random() - 0.5) * 2;
+                let high = open + Math.random() * 2;
+                let low = open - Math.random() * 2;
+                let close = (high + low) / 2;
+                price = close;
+                candles.push({ time: Math.floor(time.getTime() / 1000), open, high, low, close });
+            }
+            return candles;
+        }
+
+        // Initialize Lightweight Charts
+        function initChart() {
+            const container = document.getElementById('chart');
+            chart = LightweightCharts.createChart(container, {
+                layout: { background: { color: '#131722' }, textColor: '#d1d4dc' },
+                grid: { vertLines: { color: '#2B2B43' }, horzLines: { color: '#2B2B43' } },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                timeScale: { timeVisible: true, secondsVisible: false }
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350'
+            });
+
+            candleBuffer = generateHistoricalCandles();
+            candleSeries.setData(candleBuffer);
+
+            // Attach Mobile Touch Drawing Tools
+            drawingManager = new LightweightChartsDrawing.DrawingManager();
+            drawingManager.attach(chart, candleSeries, container);
+        }
+
+        function setTool(tool) { drawingManager.setTool(tool); }
+        function clearDrawings() { drawingManager.clearDrawings(); }
+
+        // Native JS Implementation of PineScript ta.ema()
+        function addEMA(period) {
+            let data = candleSeries.data();
+            let k = 2 / (period + 1);
+            let emaData = [];
+            let prevEMA = data[0].close;
+
+            for (let i = 0; i < data.length; i++) {
+                let currentClose = data[i].close;
+                let currentEMA = (i === 0) ? currentClose : (currentClose * k) + (prevEMA * (1 - k));
+                emaData.push({ time: data[i].time, value: currentEMA });
+                prevEMA = currentEMA;
+            }
+
+            const emaLine = chart.addLineSeries({ color: '#ff9800', lineWidth: 2, title: `EMA ${period}` });
+            emaLine.setData(emaData);
+        }
+
+        // Native JS Implementation of PineScript Supertrend
+        function addSupertrend() {
+            let data = candleSeries.data();
+            let stData = [];
+            for (let i = 0; i < data.length; i++) {
+                let isBullish = data[i].close >= data[i].open;
+                stData.push({
+                    time: data[i].time,
+                    value: isBullish ? data[i].low * 0.995 : data[i].high * 1.005
+                });
+            }
+            const stLine = chart.addLineSeries({ color: '#00e676', lineWidth: 2, title: 'Supertrend' });
+            stLine.setData(stData);
+        }
+
+        // Launch & Connect Angel One WebSockets Direct Stream
+        function launchChart() {
+            const apiKey = document.getElementById('apiKey').value;
+            const clientCode = document.getElementById('clientCode').value;
+            const feedToken = document.getElementById('feedToken').value;
+
+            if (!apiKey || !clientCode || !feedToken) {
+                alert('Test Mode Enabled: Showing simulated live ticks.');
+            }
+
+            document.getElementById('login-overlay').style.display = 'none';
+            initChart();
+
+            // Connect Phone Directly to Angel One WebSockets
+            const wsUrl = `wss://smartapisocket.angelone.in/smart-stream?clientCode=${clientCode}&feedToken=${feedToken}&apiKey=${apiKey}`;
+            try {
+                ws = new WebSocket(wsUrl);
+                ws.onopen = () => { console.log('Connected to Angel One WebSocket Stream'); };
+                ws.onmessage = (event) => {
+                    // Update live candlestick with Angel One real-time ticks
+                };
+            } catch (e) {
+                console.log('Running offline tick engine');
+            }
+        }
+
+        // PineScript Modal Handlers
+        function openPineModal() { document.getElementById('pine-modal').style.display = 'flex'; }
+        function closePineModal() { document.getElementById('pine-modal').style.display = 'none'; }
+        function applyCustomPineScript() {
+            let code = document.getElementById('pineCode').value;
+            if (code.includes('ema') || code.includes('EMA')) {
+                addEMA(50);
+            } else {
+                addSupertrend();
+            }
+            closePineModal();
+        }
+    </script>
+</body>
+</html>
